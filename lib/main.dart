@@ -48,10 +48,22 @@ class _MyHomePageState extends State<MyHomePage> {
       String chatbotResponse = responseData['message'];
       setState(() {
         _chats.add(message);
-        _chats.add(chatbotResponse);
+        _chats.add(
+            _extractContent(chatbotResponse)); // Clean up the chatbot response
       });
     } else {
       throw Exception('Failed to send message');
+    }
+  }
+
+// Function to extract content from ChatCompletionMessage
+  String _extractContent(String message) {
+    final RegExp regex = RegExp(r"content='(.*?)'");
+    final match = regex.firstMatch(message);
+    if (match != null && match.groupCount >= 1) {
+      return match.group(1) ?? message;
+    } else {
+      return message;
     }
   }
 
@@ -63,7 +75,16 @@ class _MyHomePageState extends State<MyHomePage> {
       Map<String, dynamic> responseData = jsonDecode(response.body);
       List<dynamic> chats = responseData['chats'];
       setState(() {
-        _chats = List<String>.from(chats.map((chat) => chat['message']));
+        _chats = List<String>.from(chats.map((chat) {
+          if (chat is String) {
+            return chat;
+          } else if (chat is Map<String, dynamic> &&
+              chat.containsKey('message')) {
+            return _extractContent(chat['message']);
+          } else {
+            return chat.toString();
+          }
+        }));
       });
     } else {
       throw Exception('Failed to load chats');
