@@ -27,10 +27,18 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   TextEditingController _messageController = TextEditingController();
   List<String> _chats = [];
+  List<String> _mainChats = []; // List for the main chat area
+  String _selectedChat = "";
 
   void _sendMessage() async {
     String message = _messageController.text;
     _messageController.clear();
+
+    // Add the user's message to the main chat area
+    setState(() {
+      _mainChats.insert(0,
+          message); // Insert at the beginning to show the latest message first
+    });
 
     // Make API call to backend
     final response = await http.post(
@@ -46,17 +54,20 @@ class _MyHomePageState extends State<MyHomePage> {
     if (response.statusCode == 200) {
       Map<String, dynamic> responseData = jsonDecode(response.body);
       String chatbotResponse = responseData['message'];
+
+      // Add the chatbot's response to the main chat area
       setState(() {
-        _chats.add(message);
-        _chats.add(
-            _extractContent(chatbotResponse)); // Clean up the chatbot response
+        _mainChats.insert(
+            0,
+            _extractContent(
+                chatbotResponse)); // Insert at the beginning to show the latest message first
       });
     } else {
       throw Exception('Failed to send message');
     }
   }
 
-// Function to extract content from ChatCompletionMessage
+  // Function to extract content from ChatCompletionMessage
   String _extractContent(String message) {
     final RegExp regex = RegExp(r"content='(.*?)'");
     final match = regex.firstMatch(message);
@@ -91,6 +102,12 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  void _selectChat(String chat) {
+    setState(() {
+      _selectedChat = chat;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -103,33 +120,72 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: AppBar(
         title: Text('Chatbot'),
       ),
-      body: Column(
+      body: Row(
         children: [
-          Expanded(
+          // Sidebar for recent chat history
+          Container(
+            width: 200,
             child: ListView.builder(
               itemCount: _chats.length,
               itemBuilder: (BuildContext context, int index) {
                 return ListTile(
                   title: Text(_chats[index]),
+                  onTap: () {
+                    _selectChat(_chats[index]);
+                  },
                 );
               },
             ),
           ),
-          Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Row(
+          Expanded(
+            child: Column(
               children: [
+                // Main area for displaying selected chat and current message
                 Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    decoration: InputDecoration(
-                      hintText: 'Enter your message',
+                  child: Container(
+                    alignment: Alignment.topLeft,
+                    padding: EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Display current message sent by the user
+                        Text(
+                          _mainChats.isNotEmpty
+                              ? _mainChats.first
+                              : '', // Display the latest message
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        SizedBox(height: 8),
+                        // Display selected chat
+                        Text(_selectedChat),
+                        SizedBox(height: 8),
+                        // Display previous chat history
+                        for (var chat
+                            in _mainChats.skip(1)) // Skip the latest message
+                          Text(chat),
+                      ],
                     ),
                   ),
                 ),
-                IconButton(
-                  icon: Icon(Icons.send),
-                  onPressed: _sendMessage,
+                // Input field for sending messages
+                Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _messageController,
+                          decoration: InputDecoration(
+                            hintText: 'Enter your message',
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.send),
+                        onPressed: _sendMessage,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
